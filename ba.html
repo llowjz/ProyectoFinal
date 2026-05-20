@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TelcoSight | Analítica Empresarial</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eff6ff', 500: '#3b82f6', 900: '#0f172a' },
+                        metric: { up: '#10b981', down: '#f43f5e', alert: '#f59e0b' }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8fafc; overflow: hidden; }
+        .glass-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .menu-btn.active { background-color: rgba(99, 102, 241, 0.15); color: #818cf8; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        /* Tooltip animation y prioridades */
+        .tooltip-box { transition: all 0.2s ease-in-out; }
+        .glass-card:hover { z-index: 50; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen w-screen relative">
+
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none"></div>
+
+    <div id="pantalla-login" class="fixed inset-0 bg-slate-900 z-[100] flex items-center justify-center transition-opacity duration-500">
+        <div class="bg-white p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-md mx-4 transform transition-all">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <i class="fas fa-wave-square text-white text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 tracking-tight">TelcoSight</h2>
+                <p class="text-slate-500 text-sm mt-1">Portal de Analítica Empresarial</p>
+            </div>
+            <form onsubmit="iniciarSesion(event)">
+                <div class="mb-5">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Correo Corporativo</label>
+                    <div class="relative">
+                        <i class="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="email" id="login-email" required value="admin@telcosight.com" class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm">
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="block text-sm font-semibold text-slate-700">Contraseña</label>
+                        <a href="#" onclick="recuperarContrasena(event)" class="text-xs text-indigo-600 hover:underline transition-colors">¿Olvidaste tu contraseña?</a>
+                    </div>
+                    <div class="relative">
+                        <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="password" required value="empresa123" class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors shadow-md flex justify-center items-center gap-2">
+                    <span>Ingresar al Panel</span> <i class="fas fa-arrow-right text-sm"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-campana" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-800 text-lg">Crear Nueva Campaña</h3>
+                <button onclick="cerrarModal()" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <form id="form-nueva-campana" class="p-6" onsubmit="guardarCampana(event)">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre de la Campaña</label>
+                    <input type="text" id="campana-nombre" required placeholder="Ej. Descuento 30% VIP" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Público Objetivo</label>
+                    <input type="text" id="campana-target" required placeholder="Ej. Clientes DSL riesgo medio" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Incentivo</label>
+                    <select id="campana-tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                        <option value="fa-gift text-blue-600 bg-blue-100">Beneficio Adicional</option>
+                        <option value="fa-percent text-emerald-600 bg-emerald-100">Descuento Monetario</option>
+                        <option value="fa-file-contract text-purple-600 bg-purple-100">Renegociación de Contrato</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="cerrarModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">Guardar y Activar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-dashboard" class="flex h-screen w-full opacity-0 pointer-events-none transition-opacity duration-500">
+        
+        <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col z-20">
+            <div class="h-16 flex items-center px-6 border-b border-slate-800">
+                <div class="flex items-center gap-2 text-white font-bold text-xl tracking-tight">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                        <i class="fas fa-wave-square text-sm"></i>
+                    </div>
+                    TelcoSight
+                </div>
+            </div>
+            <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+                <p class="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Analítica 2026</p>
+                <button onclick="cambiarSeccion('seccion-churn', this)" class="menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg font-medium transition-colors active bg-indigo-600/10 text-indigo-400">
+                    <i class="fas fa-chart-pie w-5"></i> Panel de Abandono
+                </button>
+                <button onclick="cambiarSeccion('seccion-clientes', this)" class="menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-left text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg font-medium transition-colors">
+                    <i class="fas fa-users w-5"></i> Base de Clientes
+                </button>
+                <button onclick="cambiarSeccion('seccion-ingresos', this)" class="menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-left text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg font-medium transition-colors">
+                    <i class="fas fa-file-invoice-dollar w-5"></i> Ingresos Mensuales
+                </button>
+                
+                <p class="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-6 mb-2">Gestión</p>
+                <button onclick="cambiarSeccion('seccion-retencion', this)" class="menu-btn w-full flex items-center gap-3 px-3 py-2.5 text-left text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg font-medium transition-colors">
+                    <i class="fas fa-bullseye w-5"></i> Retención
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800 cursor-pointer hover:bg-slate-800 transition-colors" onclick="cerrarSesion()">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <img src="https://ui-avatars.com/api/?name=U+C&background=10b981&color=fff" alt="Usuario" class="w-9 h-9 rounded-full flex-shrink-0">
+                        <div class="overflow-hidden">
+                            <p class="text-sm font-medium text-white truncate w-[120px]" title="Universidad de Cundinamarca">Univ. Cundinamarca</p>
+                            <p class="text-xs text-slate-400">Cerrar Sesión</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-sign-out-alt text-slate-500 ml-1"></i>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-screen overflow-hidden">
+            
+            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-[60]">
+                <div class="flex items-center gap-4">
+                    <h1 id="titulo-pagina" class="text-xl font-semibold text-slate-800">Resumen de Abandono de Clientes (Churn)</h1>
+                    <span class="bg-indigo-50 text-indigo-700 text-xs font-medium px-2.5 py-1 rounded-full border border-indigo-100">Datos a Mayo 2026</span>
+                </div>
+                <div class="flex items-center gap-5 text-slate-500">
+                    <div class="relative group">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input id="buscador-global" type="text" onkeyup="buscarCliente()" placeholder="Buscar en Base de Clientes..." class="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-indigo-500 outline-none w-64">
+                    </div>
+                    
+                    <div class="relative">
+                        <button id="btn-campana" onclick="toggleNotificaciones()" class="hover:text-slate-700 relative transition-colors p-1">
+                            <i class="far fa-bell text-xl"></i>
+                            <span id="badge-noti" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm">5</span>
+                        </button>
+                        
+                        <div id="panel-notificaciones" class="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 hidden z-[999] overflow-hidden flex flex-col">
+                            <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <span class="font-bold text-slate-800 text-sm">Centro de Notificaciones</span>
+                                <span class="text-xs text-indigo-600 cursor-pointer hover:underline font-medium" onclick="toggleNotificaciones()">Marcar leídas</span>
+                            </div>
+                            
+                            <div class="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
+                                <div class="p-4 hover:bg-slate-50 cursor-pointer flex gap-3 transition-colors">
+                                    <div class="text-rose-500 mt-0.5"><i class="fas fa-exclamation-circle text-lg"></i></div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-800">Alerta de Churn Crítico</p>
+                                        <p class="text-xs text-slate-600 mt-1">3 clientes VIP pasaron a riesgo alto este mes (Mayo 2026).</p>
+                                        <p class="text-[10px] text-slate-400 mt-1.5 font-medium">Hace 10 min</p>
+                                    </div>
+                                </div>
+                                <div class="p-4 hover:bg-slate-50 cursor-pointer flex gap-3 transition-colors">
+                                    <div class="text-emerald-500 mt-0.5"><i class="fas fa-check-circle text-lg"></i></div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-800">Campaña Exitosa</p>
+                                        <p class="text-xs text-slate-600 mt-1">La campaña "Upgrade a Fibra" alcanzó 124 conversiones hoy.</p>
+                                        <p class="text-[10px] text-slate-400 mt-1.5 font-medium">Hace 2 horas</p>
+                                    </div>
+                                </div>
+                                <div class="p-4 hover:bg-slate-50 cursor-pointer flex gap-3 transition-colors">
+                                    <div class="text-indigo-500 mt-0.5"><i class="fas fa-file-invoice text-lg"></i></div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-800">Reporte Generado</p>
+                                        <p class="text-xs text-slate-600 mt-1">El cierre financiero de Abril 2026 ya está consolidado en el sistema.</p>
+                                        <p class="text-[10px] text-slate-400 mt-1.5 font-medium">Ayer a las 18:30</p>
+                                    </div>
+                                </div>
+                                <div class="p-4 hover:bg-slate-50 cursor-pointer flex gap-3 transition-colors">
+                                    <div class="text-amber-500 mt-0.5"><i class="fas fa-exclamation-triangle text-lg"></i></div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-800">Anomalía en Ingresos</p>
+                                        <p class="text-xs text-slate-600 mt-1">Se detectó una caída del 2.4% en el MRR proyectado para contratos mensuales.</p>
+                                        <p class="text-[10px] text-slate-400 mt-1.5 font-medium">Ayer a las 09:15</p>
+                                    </div>
+                                </div>
+                                <div class="p-4 hover:bg-slate-50 cursor-pointer flex gap-3 transition-colors">
+                                    <div class="text-blue-500 mt-0.5"><i class="fas fa-server text-lg"></i></div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-800">Actualización del Sistema</p>
+                                        <p class="text-xs text-slate-600 mt-1">TelcoSight tendrá mantenimiento programado este viernes a las 02:00 AM.</p>
+                                        <p class="text-[10px] text-slate-400 mt-1.5 font-medium">Hace 2 días</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="exportarDatosActuales()" class="bg-slate-900 text-white text-sm font-medium px-4 py-1.5 rounded-lg hover:bg-slate-800 flex items-center transition-colors shadow-sm">
+                        <i class="fas fa-download mr-1.5"></i> Exportar
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto bg-slate-50 relative">
+
+                <div id="seccion-churn" class="seccion-contenido p-6 md:p-8 block">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="glass-card p-5 relative">
+                            <div class="flex items-center gap-2 mb-1 group cursor-pointer w-max relative z-50">
+                                <p class="text-sm font-medium text-slate-500">Total Activos (Mayo '26)</p>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors text-xs"></i>
+                                <div class="tooltip-box absolute top-full left-0 mt-2 w-56 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Número total de clientes vigentes y facturando al cierre de este mes.
+                                    <div class="absolute bottom-full left-4 border-4 border-transparent border-b-slate-900"></div>
+                                </div>
+                            </div>
+                            <h3 class="text-3xl font-bold text-slate-800 mt-1">5,174</h3>
+                        </div>
+
+                        <div class="glass-card p-5 border-l-4 border-l-metric-down relative">
+                            <div class="flex items-center gap-2 mb-1 group cursor-pointer w-max relative z-50">
+                                <p class="text-sm font-medium text-slate-500">Tasa Abandono YTD</p>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors text-xs"></i>
+                                <div class="tooltip-box absolute top-full left-0 mt-2 w-56 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Porcentaje de clientes que han cancelado sus servicios en lo que va del año (Year-To-Date).
+                                    <div class="absolute bottom-full left-4 border-4 border-transparent border-b-slate-900"></div>
+                                </div>
+                            </div>
+                            <h3 class="text-3xl font-bold text-slate-800 mt-1">26.5%</h3>
+                        </div>
+
+                        <div class="glass-card p-5 relative">
+                            <div class="flex items-center gap-2 mb-1 group cursor-pointer w-max relative z-50">
+                                <p class="text-sm font-medium text-slate-500">MRR Total</p>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors text-xs"></i>
+                                <div class="tooltip-box absolute top-full left-0 mt-2 w-56 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Ingreso Recurrente Mensual (Monthly Recurring Revenue). Dinero facturado mensualmente por la base activa.
+                                    <div class="absolute bottom-full left-4 border-4 border-transparent border-b-slate-900"></div>
+                                </div>
+                            </div>
+                            <h3 class="text-3xl font-bold text-slate-800 mt-1">$456.1K</h3>
+                        </div>
+
+                        <div class="glass-card p-5 relative">
+                            <div class="flex items-center gap-2 mb-1 group cursor-pointer w-max relative z-50">
+                                <p class="text-sm font-medium text-slate-500">Pérdida (LTV 2026)</p>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors text-xs"></i>
+                                <div class="tooltip-box absolute top-full right-0 mt-2 w-56 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Valor de Vida del Cliente perdido. Dinero que la empresa dejará de percibir debido a las cancelaciones.
+                                    <div class="absolute bottom-full right-4 border-4 border-transparent border-b-slate-900"></div>
+                                </div>
+                            </div>
+                            <h3 class="text-3xl font-bold text-slate-800 mt-1">$139.1K</h3>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div class="glass-card p-6 lg:col-span-1 relative flex flex-col">
+                            <div class="flex items-center gap-2 mb-4 group cursor-pointer w-max relative z-50">
+                                <h3 class="text-base font-semibold text-slate-800">Proporción de Abandono</h3>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors"></i>
+                                <div class="tooltip-box absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Muestra visualmente qué porcentaje de la base total de clientes ha cancelado su servicio en comparación con los que continúan activos.
+                                    <div class="absolute top-full left-6 border-4 border-transparent border-t-slate-900"></div>
+                                </div>
+                            </div>
+                            <div class="relative flex-1 w-full flex justify-center items-center min-h-[200px] z-10"><canvas id="churnDoughnut"></canvas></div>
+                        </div>
+                        
+                        <div class="glass-card p-6 lg:col-span-2 relative">
+                            <div class="flex items-center gap-2 mb-4 group cursor-pointer w-max relative z-50">
+                                <h3 class="text-base font-semibold text-slate-800">Riesgo por Antigüedad</h3>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors"></i>
+                                <div class="tooltip-box absolute bottom-full left-0 mb-2 w-72 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Ilustra en qué momento de su ciclo de vida los clientes tienden a irse. Un pico alto al principio indica que el proceso de adaptación (onboarding) está fallando.
+                                    <div class="absolute top-full left-6 border-4 border-transparent border-t-slate-900"></div>
+                                </div>
+                            </div>
+                            <div class="relative w-full h-64 z-10"><canvas id="tenureAreaChart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="glass-card p-6 relative">
+                            <div class="flex items-center gap-2 mb-4 group cursor-pointer w-max relative z-50">
+                                <h3 class="text-base font-semibold text-slate-800">Retención por Contrato</h3>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors"></i>
+                                <div class="tooltip-box absolute bottom-full left-0 mb-2 w-72 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Compara cuántos usuarios se van dependiendo de su contrato. Ayuda a confirmar si los contratos a largo plazo (1 o 2 años) realmente mejoran la retención.
+                                    <div class="absolute top-full left-6 border-4 border-transparent border-t-slate-900"></div>
+                                </div>
+                            </div>
+                            <div class="relative w-full h-64 z-10"><canvas id="contractChart"></canvas></div>
+                        </div>
+
+                        <div class="glass-card p-6 relative">
+                            <div class="flex items-center gap-2 mb-4 group cursor-pointer w-max relative z-50">
+                                <h3 class="text-base font-semibold text-slate-800">Impacto del Servicio</h3>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors"></i>
+                                <div class="tooltip-box absolute bottom-full left-0 mb-2 w-72 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Identifica qué características específicas (ej. carecer de Soporte Técnico) son los principales focos de insatisfacción y pérdida de clientes.
+                                    <div class="absolute top-full left-6 border-4 border-transparent border-t-slate-900"></div>
+                                </div>
+                            </div>
+                            <div class="relative w-full h-64 z-10"><canvas id="servicesChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="seccion-clientes" class="seccion-contenido p-6 md:p-8 hidden">
+                    <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800">Explorador de Clientes en Riesgo</h2>
+                            <p class="text-sm text-slate-500 mt-1">Directorio actualizado al Q2 - 2026. Usa el filtro para segmentar.</p>
+                        </div>
+                        <select id="filtro-riesgo" onchange="filtrarPorRiesgo(this.value)" class="bg-white border border-slate-200 text-sm rounded-lg px-4 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500">
+                            <option value="Todos">Todos los riesgos</option>
+                            <option value="Crítico">Crítico (Alta fuga)</option>
+                            <option value="Estable">Estable</option>
+                        </select>
+                    </div>
+
+                    <div class="glass-card overflow-hidden">
+                        <table class="w-full text-left border-collapse" id="tabla-clientes">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+                                    <th class="p-4">ID Cliente</th><th class="p-4">Antigüedad</th><th class="p-4">Servicio</th><th class="p-4">Contrato</th><th class="p-4">Cargos</th><th class="p-4">Riesgo</th><th class="p-4 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-clientes" class="text-sm divide-y divide-slate-100">
+                                <tr class="hover:bg-slate-50" data-riesgo="Crítico">
+                                    <td class="p-4 font-medium text-indigo-600">7590-VHVEG</td><td class="p-4">1 mes</td><td class="p-4"><span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">DSL</span></td><td class="p-4">Mensual</td><td class="p-4 font-semibold">$29.85</td><td class="p-4"><span class="text-rose-700 font-semibold text-xs"><i class="fas fa-circle text-[8px] mr-1"></i> Crítico</span></td><td class="p-4 text-center"><button class="text-slate-400 hover:text-indigo-600 p-2"><i class="fas fa-ellipsis-v"></i></button></td>
+                                </tr>
+                                <tr class="hover:bg-slate-50" data-riesgo="Estable">
+                                    <td class="p-4 font-medium text-indigo-600">5575-GNVDE</td><td class="p-4">34 meses</td><td class="p-4"><span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">DSL</span></td><td class="p-4">1 Año</td><td class="p-4 font-semibold">$56.95</td><td class="p-4"><span class="text-emerald-700 font-semibold text-xs"><i class="fas fa-circle text-[8px] mr-1"></i> Estable</span></td><td class="p-4 text-center"><button class="text-slate-400 hover:text-indigo-600 p-2"><i class="fas fa-ellipsis-v"></i></button></td>
+                                </tr>
+                                <tr class="hover:bg-slate-50" data-riesgo="Crítico">
+                                    <td class="p-4 font-medium text-indigo-600">9237-HQITU</td><td class="p-4">2 meses</td><td class="p-4"><span class="bg-purple-50 text-purple-700 px-2 py-1 rounded text-xs">Fibra Óptica</span></td><td class="p-4">Mensual</td><td class="p-4 font-semibold">$70.70</td><td class="p-4"><span class="text-rose-700 font-semibold text-xs"><i class="fas fa-circle text-[8px] mr-1"></i> Crítico</span></td><td class="p-4 text-center"><button class="text-slate-400 hover:text-indigo-600 p-2"><i class="fas fa-ellipsis-v"></i></button></td>
+                                </tr>
+                                <tr class="hover:bg-slate-50" data-riesgo="Estable">
+                                    <td class="p-4 font-medium text-indigo-600">7795-CFOCW</td><td class="p-4">45 meses</td><td class="p-4"><span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">DSL</span></td><td class="p-4">1 Año</td><td class="p-4 font-semibold">$42.30</td><td class="p-4"><span class="text-emerald-700 font-semibold text-xs"><i class="fas fa-circle text-[8px] mr-1"></i> Estable</span></td><td class="p-4 text-center"><button class="text-slate-400 hover:text-indigo-600 p-2"><i class="fas fa-ellipsis-v"></i></button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="p-4 border-t border-slate-100 text-center">
+                            <button id="btn-cargar-clientes" onclick="cargarMasClientes()" class="text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors">
+                                Cargar más clientes <i class="fas fa-chevron-down ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="seccion-ingresos" class="seccion-contenido p-6 md:p-8 hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="glass-card p-6 border-b-4 border-b-emerald-500"><p class="text-sm text-slate-500">Ingreso Recurrente (MRR)</p><h3 class="text-3xl font-bold mt-2">$456,116</h3></div>
+                        <div class="glass-card p-6 border-b-4 border-b-blue-500"><p class="text-sm text-slate-500">Ticket Promedio (ARPU)</p><h3 class="text-3xl font-bold mt-2">$64.76</h3></div>
+                        <div class="glass-card p-6 border-b-4 border-b-rose-500"><p class="text-sm text-slate-500">Impacto de Fuga</p><h3 class="text-3xl font-bold mt-2">$139,130</h3></div>
+                    </div>
+                    <div class="glass-card p-6 relative">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="flex items-center gap-2 group cursor-pointer w-max relative z-50">
+                                <h3 class="text-base font-semibold text-slate-800">Evolución de Fuga de Capital</h3>
+                                <i class="fas fa-info-circle text-slate-400 hover:text-indigo-600 transition-colors"></i>
+                                <div class="tooltip-box absolute bottom-full left-0 mb-2 w-72 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible shadow-2xl leading-relaxed z-[999]">
+                                    Muestra la tendencia histórica del dinero perdido mes a mes. Ayuda a prever fluctuaciones y medir si las campañas de retención están reduciendo las pérdidas.
+                                    <div class="absolute top-full left-6 border-4 border-transparent border-t-slate-900"></div>
+                                </div>
+                            </div>
+                            <span class="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded z-10">Nov 2025 - May 2026</span>
+                        </div>
+                        <div class="relative h-80 z-10"><canvas id="financeChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div id="seccion-retencion" class="seccion-contenido p-6 md:p-8 hidden">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-xl font-bold">Gestión de Retención</h2>
+                            <p class="text-sm text-slate-500 mt-1">Estatus de campañas empresariales activas (2026).</p>
+                        </div>
+                        <button onclick="abrirModal()" class="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors"><i class="fas fa-plus mr-1.5"></i> Nueva Campaña</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div class="glass-card p-5"><p class="text-sm text-slate-500">Clientes Salvados (YTD)</p><h3 class="text-2xl font-bold text-indigo-600">342</h3></div>
+                        <div class="glass-card p-5"><p class="text-sm text-slate-500">Éxito Ofertas</p><h3 class="text-2xl font-bold">41.2%</h3></div>
+                        <div class="glass-card p-5"><p class="text-sm text-slate-500">Presupuesto (2026)</p><h3 class="text-2xl font-bold">$12,450</h3></div>
+                        <div class="glass-card p-5 bg-emerald-50"><p class="text-sm text-emerald-700">ROI Retención</p><h3 class="text-2xl font-bold text-emerald-700">+315%</h3></div>
+                    </div>
+                    <div class="glass-card overflow-hidden">
+                        <div class="p-5 border-b border-slate-100 bg-slate-50"><h3 class="font-semibold text-slate-800">Campañas Activas</h3></div>
+                        <div id="lista-campanas" class="divide-y divide-slate-100">
+                            <div class="p-5 flex justify-between items-center hover:bg-slate-50">
+                                <div class="flex gap-4 items-center">
+                                    <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><i class="fas fa-gift"></i></div>
+                                    <div><h4 class="font-semibold">Upgrade a Fibra</h4><p class="text-xs text-slate-500">Clientes DSL +2 años</p></div>
+                                </div>
+                                <span class="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded text-xs font-semibold">Activa</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let graficosYaCargados = false;
+
+        function iniciarSesion(event) {
+            event.preventDefault();
+            const pantallaLogin = document.getElementById('pantalla-login');
+            pantallaLogin.classList.add('opacity-0', 'pointer-events-none');
+            const appDashboard = document.getElementById('app-dashboard');
+            appDashboard.classList.remove('opacity-0', 'pointer-events-none');
+            
+            if(!graficosYaCargados) {
+                setTimeout(inicializarGraficos, 100); 
+                graficosYaCargados = true;
+            }
+            setTimeout(() => { pantallaLogin.style.display = 'none'; }, 500);
+            mostrarNotificacion("Bienvenido al sistema de analítica TelcoSight.", "success");
+        }
+
+        function cerrarSesion() {
+            const pantallaLogin = document.getElementById('pantalla-login');
+            pantallaLogin.style.display = 'flex';
+            setTimeout(() => {
+                pantallaLogin.classList.remove('opacity-0', 'pointer-events-none');
+                document.getElementById('app-dashboard').classList.add('opacity-0', 'pointer-events-none');
+            }, 50);
+            cambiarSeccion('seccion-churn', document.querySelectorAll('.menu-btn')[0]);
+        }
+
+        function recuperarContrasena(event) {
+            event.preventDefault(); 
+            const emailInput = document.getElementById('login-email').value.trim();
+            if (emailInput !== "") {
+                mostrarNotificacion(`Se ha enviado un enlace de recuperación a: ${emailInput}`, 'success');
+            } else {
+                mostrarNotificacion('Por favor, ingresa tu correo corporativo para recuperar la contraseña.', 'info');
+                document.getElementById('login-email').focus();
+            }
+        }
+
+        function filtrarPorRiesgo(valorSeleccionado) {
+            const filas = document.querySelectorAll('#tbody-clientes tr');
+            filas.forEach(fila => {
+                const riesgoFila = fila.getAttribute('data-riesgo');
+                if (valorSeleccionado === 'Todos' || riesgoFila === valorSeleccionado) {
+                    fila.style.display = '';
+                } else {
+                    fila.style.display = 'none';
+                }
+            });
+        }
+
+        const nuevosClientesBD = [
+            { id: "0639-TSIQW", ant: "67 meses", serv: "Fibra Óptica", colS: "purple", cont: "Mensual", pago: "$102.95", riesgo: "Crítico", colR: "rose" },
+            { id: "8456-QDAVC", ant: "19 meses", serv: "Fibra Óptica", colS: "purple", cont: "Mensual", pago: "$78.70", riesgo: "Crítico", colR: "rose" },
+            { id: "7750-EYXWZ", ant: "12 meses", serv: "DSL", colS: "blue", cont: "1 Año", pago: "$60.65", riesgo: "Estable", colR: "emerald" }
+        ];
+
+        function cargarMasClientes() {
+            const btn = document.getElementById('btn-cargar-clientes');
+            const tbody = document.getElementById('tbody-clientes');
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Cargando...`;
+            btn.disabled = true;
+
+            setTimeout(() => {
+                let html = nuevosClientesBD.map(c => `
+                    <tr class="hover:bg-slate-50" data-riesgo="${c.riesgo}">
+                        <td class="p-4 font-medium text-indigo-600">${c.id}</td><td class="p-4">${c.ant}</td>
+                        <td class="p-4"><span class="bg-${c.colS}-50 text-${c.colS}-700 px-2 py-1 rounded text-xs">${c.serv}</span></td>
+                        <td class="p-4">${c.cont}</td><td class="p-4 font-semibold">${c.pago}</td>
+                        <td class="p-4"><span class="text-${c.colR}-700 font-semibold text-xs"><i class="fas fa-circle text-[8px] mr-1"></i> ${c.riesgo}</span></td>
+                        <td class="p-4 text-center"><button class="text-slate-400 hover:text-indigo-600 p-2"><i class="fas fa-ellipsis-v"></i></button></td>
+                    </tr>
+                `).join('');
+                
+                tbody.insertAdjacentHTML('beforeend', html);
+                const filtroActual = document.getElementById('filtro-riesgo').value;
+                filtrarPorRiesgo(filtroActual);
+
+                btn.style.display = 'none';
+                mostrarNotificacion("Se cargaron 3 registros de la base de datos.", "success");
+            }, 600);
+        }
+
+        // ================= SISTEMA DE CIERRE AUTOMÁTICO NOTIFICACIONES =================
+        function toggleNotificaciones() {
+            const panel = document.getElementById('panel-notificaciones');
+            panel.classList.toggle('hidden');
+            document.getElementById('badge-noti').classList.add('hidden');
+        }
+
+        // Escucha clics en toda la pantalla
+        document.addEventListener('click', function(event) {
+            const panel = document.getElementById('panel-notificaciones');
+            const btn = document.getElementById('btn-campana');
+            
+            // Si el panel existe y está abierto
+            if (panel && btn && !panel.classList.contains('hidden')) {
+                // Si hacemos clic en un lugar que NO sea dentro del panel y NO sea el botón de campana
+                if (!panel.contains(event.target) && !btn.contains(event.target)) {
+                    panel.classList.add('hidden'); // Lo cerramos
+                }
+            }
+        });
+
+        function abrirModal() { document.getElementById('modal-campana').classList.remove('hidden'); }
+        function cerrarModal() { document.getElementById('modal-campana').classList.add('hidden'); document.getElementById('form-nueva-campana').reset(); }
+
+        function guardarCampana(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('campana-nombre').value;
+            const cl = document.getElementById('campana-tipo').value;
+            const target = document.getElementById('campana-target').value;
+            const html = `
+                <div class="p-5 flex justify-between items-center hover:bg-slate-50 bg-indigo-50/20">
+                    <div class="flex gap-4 items-center">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center ${cl.split(' ')[2]} ${cl.split(' ')[1]}"><i class="fas ${cl.split(' ')[0]}"></i></div>
+                        <div><h4 class="font-semibold">${nombre}</h4><p class="text-xs text-slate-500">${target}</p></div>
+                    </div>
+                    <span class="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded text-xs font-semibold">¡Nueva!</span>
+                </div>`;
+            document.getElementById('lista-campanas').insertAdjacentHTML('afterbegin', html);
+            cerrarModal(); mostrarNotificacion(`Campaña ${nombre} guardada.`, 'success');
+        }
+
+        function mostrarNotificacion(msg, tipo = 'info') {
+            const cont = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `${tipo === 'success' ? 'bg-emerald-600' : 'bg-slate-800'} text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all duration-300 transform translate-y-4 opacity-0 text-sm pointer-events-auto`;
+            toast.innerHTML = `<i class="fas ${tipo === 'success' ? 'fa-check-circle' : 'fa-info-circle'}"></i> <span>${msg}</span>`;
+            cont.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-4', 'opacity-0'), 10);
+            setTimeout(() => { toast.classList.add('opacity-0', 'scale-95'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        function cambiarSeccion(id, btn) {
+            document.querySelectorAll('.seccion-contenido').forEach(s => s.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            document.querySelectorAll('.menu-btn').forEach(b => { b.classList.remove('active', 'bg-indigo-600/10', 'text-indigo-400'); b.classList.add('text-slate-400'); });
+            btn.classList.remove('text-slate-400'); btn.classList.add('active', 'bg-indigo-600/10', 'text-indigo-400');
+            const t = { 'seccion-churn': 'Resumen de Abandono', 'seccion-clientes': 'Base de Clientes', 'seccion-ingresos': 'Ingresos Mensuales', 'seccion-retencion': 'Gestión de Retención' };
+            document.getElementById('titulo-pagina').innerText = t[id];
+        }
+
+        function buscarCliente() {
+            let input = document.getElementById('buscador-global').value.toUpperCase();
+            document.querySelectorAll('#tbody-clientes tr').forEach(f => f.style.display = f.innerText.toUpperCase().indexOf(input) > -1 ? "" : "none");
+        }
+
+        function exportarDatosActuales() {
+            let pestañaActiva = document.querySelector('.seccion-contenido:not(.hidden)').id;
+            let datosCSV = "";
+            let nombreArchivo = "";
+
+            if (pestañaActiva === 'seccion-churn') {
+                datosCSV += "Indicador,Valor,Descripcion\n";
+                datosCSV += "Total Activos (Mayo 26),5174,Numero total de clientes vigentes y facturando al cierre de este mes.\n";
+                datosCSV += "Tasa Abandono YTD,26.5%,Porcentaje de clientes que han cancelado sus servicios en lo que va del año.\n";
+                datosCSV += "MRR Total,$456.1K,Ingreso Recurrente Mensual de la base activa.\n";
+                datosCSV += "Perdida (LTV 2026),$139.1K,Dinero que la empresa dejara de percibir debido a las cancelaciones.\n";
+                datosCSV += "\nCategoria,Retenidos,Perdidos\n";
+                datosCSV += "Proporcion General,73.5%,26.5%\n";
+                datosCSV += "Contrato Mensual,2220,1655\n";
+                datosCSV += "Contrato 1 Ano,1307,166\n";
+                datosCSV += "Contrato 2 Anos,1647,48\n";
+                nombreArchivo = "TelcoSight_Resumen_Abandono.csv";
+                
+            } else if (pestañaActiva === 'seccion-clientes') {
+                datosCSV += "ID Cliente,Antiguedad,Servicio Internet,Contrato,Cargos Mensuales,Riesgo\n";
+                let filas = document.querySelectorAll('#tbody-clientes tr');
+                filas.forEach(fila => {
+                    if (fila.style.display !== 'none') {
+                        let celdas = fila.querySelectorAll('td');
+                        let id = celdas[0].innerText.trim();
+                        let ant = celdas[1].innerText.trim();
+                        let serv = celdas[2].innerText.trim();
+                        let cont = celdas[3].innerText.trim();
+                        let cargo = celdas[4].innerText.trim();
+                        let riesgo = celdas[5].innerText.trim();
+                        datosCSV += `${id},${ant},${serv},${cont},${cargo},${riesgo}\n`;
+                    }
+                });
+                nombreArchivo = "TelcoSight_Directorio_Clientes.csv";
+                
+            } else if (pestañaActiva === 'seccion-ingresos') {
+                datosCSV += "Metrica Financiera,Valor\n";
+                datosCSV += "Ingreso Recurrente (MRR),$456116\n";
+                datosCSV += "Ticket Promedio (ARPU),$64.76\n";
+                datosCSV += "Impacto de Fuga,$139130\n";
+                datosCSV += "\nEvolucion de Fuga de Capital,Valor\n";
+                datosCSV += "Nov 2025,$15000\nDic 2025,$14200\nEne 2026,$11000\nFeb 2026,$12500\nMar 2026,$10800\nAbr 2026,$18500\nMay 2026,$24000\n";
+                nombreArchivo = "TelcoSight_Reporte_Financiero.csv";
+                
+            } else if (pestañaActiva === 'seccion-retencion') {
+                datosCSV += "Metrica,Valor\n";
+                datosCSV += "Clientes Salvados (YTD),342\n";
+                datosCSV += "Exito Ofertas,41.2%\n";
+                datosCSV += "Presupuesto Utilizado,$12450\n";
+                datosCSV += "ROI Retencion,+315%\n";
+                datosCSV += "\nCampana Activa,Publico Objetivo\n";
+                
+                let campanas = document.querySelectorAll('#lista-campanas > div');
+                campanas.forEach(camp => {
+                    let titulo = camp.querySelector('h4').innerText.trim();
+                    let target = camp.querySelector('p').innerText.trim();
+                    datosCSV += `${titulo},${target}\n`;
+                });
+                nombreArchivo = "TelcoSight_Gestion_Campanas.csv";
+            }
+
+            const blob = new Blob([datosCSV], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", nombreArchivo);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            mostrarNotificacion(`Archivo CSV descargado con éxito.`, "success");
+        }
+
+        function inicializarGraficos() {
+            Chart.defaults.font.family = "'Inter', sans-serif"; Chart.defaults.color = '#64748b'; Chart.defaults.scale.grid.display = false;
+            
+            new Chart(document.getElementById('churnDoughnut'), { type: 'doughnut', data: { labels: ['Retenidos', 'Perdidos'], datasets: [{ data: [5174, 1869], backgroundColor: ['#0ea5e9', '#f43f5e'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom' } } } });
+            new Chart(document.getElementById('tenureAreaChart'), { type: 'line', data: { labels: ['0-6m', '7-12m', '1a', '2a', '3a', '4a', '5a+'], datasets: [{ label: 'Abandonos', data: [980, 420, 210, 105, 80, 45, 29], borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.2)', fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+            new Chart(document.getElementById('contractChart'), { type: 'bar', data: { labels: ['Mensual', '1 Año', '2 Años'], datasets: [{ label: 'Se Quedaron', data: [2220, 1307, 1647], backgroundColor: '#38bdf8' }, { label: 'Se Fueron', data: [1655, 166, 48], backgroundColor: '#f43f5e' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
+            new Chart(document.getElementById('servicesChart'), { type: 'bar', data: { labels: ['Fibra', 'Sin Soporte', 'Fact. Elec.', 'DSL'], datasets: [{ data: [41.9, 41.6, 33.5, 19.0], backgroundColor: ['#8b5cf6', '#f59e0b', '#94a3b8', '#0ea5e9'], borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+            new Chart(document.getElementById('financeChart'), { 
+                type: 'line', 
+                data: { 
+                    labels: ['Nov 2025', 'Dic 2025', 'Ene 2026', 'Feb 2026', 'Mar 2026', 'Abr 2026', 'May 2026'], 
+                    datasets: [{ 
+                        data: [15000, 14200, 11000, 12500, 10800, 18500, 24000], 
+                        borderColor: '#f43f5e', 
+                        backgroundColor: 'rgba(244, 63, 94, 0.1)', 
+                        fill: true, 
+                        tension: 0.3 
+                    }] 
+                }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
+            });
+        }
+    </script>
+</body>
+</html>
